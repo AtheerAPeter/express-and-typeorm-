@@ -1,32 +1,49 @@
-import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, ManyToMany} from "typeorm";
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  ManyToMany,
+  CreateDateColumn,
+  OneToMany,
+  BaseEntity,
+} from "typeorm";
 import { Category } from "./Category";
 import { InvoiceItem } from "./InvoiceItem";
 
 @Entity()
-export class Product {
+export class Product extends BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
 
-    @PrimaryGeneratedColumn()
-    id: number;
-   
-    @Column()
-    name: string;
+  @Column()
+  name: string;
 
-    @Column({type: "float"})
-    price: number;
+  @Column({ type: "float" })
+  price: number;
 
-    @Column({nullable: true})
-    image: string;
+  @Column({ nullable: true })
+  image: string;
 
-    @Column({nullable:true})
-    description: string;
+  @Column({ nullable: true })
+  description: string;
 
-    @Column()
-    active: boolean;
+  @Column()
+  active: boolean;
 
-    @ManyToOne(type=> InvoiceItem, invoiceitem=> invoiceitem.products)
-    invoiceItem: Product;
+  @Column()
+  @CreateDateColumn()
+  createdAt: Date;
 
-    @ManyToOne(type=> Category, category=> category.products)
-    category: Category;
+  @Column()
+  @CreateDateColumn()
+  updatedAt: Date;
 
+  //-------------------relations---------------------------//
+
+  @ManyToOne((type) => Category, (category) => category.products)
+  category: Category;
+
+  @OneToMany((type) => InvoiceItem, (invoiceItem) => invoiceItem.product)
+  invoiceItems: InvoiceItem[];
 }

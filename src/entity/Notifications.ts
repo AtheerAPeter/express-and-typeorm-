@@ -1,21 +1,19 @@
-import {Entity, PrimaryGeneratedColumn, Column} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, BaseEntity } from "typeorm";
 
 @Entity()
-export class Notifications {
+export class Notifications extends BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
 
-    @PrimaryGeneratedColumn()
-    id: number;
+  @Column()
+  title: string;
 
-    @Column()
-    title: string;
+  @Column()
+  text: string;
 
-    @Column()
-    text: string;
+  @Column({ unique: true, nullable: true })
+  type: string;
 
-    @Column({unique: true, nullable: true})
-    type: string;
-
-    @Column()
-    userId: number;
-
+  @Column()
+  userId: number;
 }

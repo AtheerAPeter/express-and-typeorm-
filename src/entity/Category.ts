@@ -1,21 +1,37 @@
-import {Entity, PrimaryGeneratedColumn, Column, OneToMany} from "typeorm";
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  CreateDateColumn,
+  BaseEntity,
+} from "typeorm";
 import { Product } from "./Product";
 
 @Entity()
-export class Category {
+export class Category extends BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
 
-    @PrimaryGeneratedColumn()
-    id: number;
+  @Column()
+  title: string;
 
-    @Column()
-    title: string;
+  @Column()
+  image: string;
 
-    @Column()
-    icon: string;
+  @Column({ unique: true, nullable: true })
+  active: boolean;
 
-    @Column({unique: true, nullable: true})
-    active: boolean;
+  @Column()
+  @CreateDateColumn()
+  createdAt: Date;
 
-  @OneToMany(type=> Product, product=> product.category)
-  products: Product[]
+  @Column()
+  @CreateDateColumn()
+  updatedAt: Date;
+
+  //--------------------------realtions---------------------//
+
+  @OneToMany((type) => Product, (product) => product.category)
+  products: Product[];
 }

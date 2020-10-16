@@ -4,7 +4,7 @@
    "port": 5432,
    "username": "popos",
    "password": "atheer",
-   "database": "shop-test",
+   "database": "shop-test2",
    "synchronize": true,
    "logging": false,
    "entities": [

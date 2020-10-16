@@ -1,30 +1,48 @@
-import { type } from "os";
-import {Entity, PrimaryGeneratedColumn, Column, OneToMany} from "typeorm";
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  CreateDateColumn,
+  BaseEntity,
+} from "typeorm";
 import { Invoice } from "./Invoice";
 
 @Entity()
-export class User {
+export class User extends BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
 
-    @PrimaryGeneratedColumn()
-    id: number;
+  @Column()
+  name: string;
 
-    @Column()
-    name: string;
+  @Column({ unique: true })
+  phone: string;
 
-    @Column()
-    phone: string;
+  @Column()
+  password: string;
 
-    @Column()
-    password: string;
+  @Column()
+  otp: number;
 
-    @Column()
-    active: boolean;
+  @Column()
+  active: boolean;
 
-    @Column()
-    complete: boolean;
+  @Column()
+  complete: boolean;
 
+  //timestamp
 
-    @OneToMany((type)=> Invoice, (invoice)=> invoice.user)
-    invoices: Invoice[];
+  @Column()
+  @CreateDateColumn()
+  createdAt: Date;
 
+  @Column()
+  @CreateDateColumn()
+  updatedAt: Date;
+
+  // --------------------------relations-------------------------//
+
+  @OneToMany((type) => Invoice, (invoice) => invoice.user)
+  invoices: Invoice[];
 }

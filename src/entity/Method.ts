@@ -5,27 +5,26 @@ import {
   CreateDateColumn,
   BaseEntity,
 } from "typeorm";
-import { extend } from "validate.js";
 
 @Entity()
-export class Admin extends BaseEntity {
+export class Method extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
-  name: string;
+  title: string;
 
-  @Column({ unique: true })
-  email: string;
-
-  @Column()
-  password: string;
+  @Column({ type: "float" })
+  min: number;
 
   @Column()
-  type: string; //admin // care // finance
+  max: number;
 
   @Column()
-  active: boolean;
+  url: string;
+
+  @Column()
+  image: string;
 
   @Column()
   @CreateDateColumn()
@@ -34,4 +33,6 @@ export class Admin extends BaseEntity {
   @Column()
   @CreateDateColumn()
   updatedAt: Date;
+
+  //----------------------relations-------------------------//
 }
