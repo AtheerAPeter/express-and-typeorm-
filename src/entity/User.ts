@@ -31,6 +31,8 @@ export class User extends BaseEntity {
   @Column()
   complete: boolean;
 
+  @Column()
+  token: string;
   //timestamp
 
   @Column()

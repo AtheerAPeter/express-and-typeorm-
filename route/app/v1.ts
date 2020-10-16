@@ -6,6 +6,9 @@ const router = express.Router();
 // create v1
 //// register
 router.post("/register", UserController.register);
+router.post("/login", UserController.login);
+router.post("/otp", UserController.otp);
+
 //// login
 
 //// catigories
