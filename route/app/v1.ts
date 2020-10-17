@@ -8,6 +8,9 @@ const router = express.Router();
 router.post("/register", UserController.register);
 router.post("/login", UserController.login);
 router.post("/otp", UserController.otp);
+router.get("/categories", UserController.categories);
+router.get("/products/:id", UserController.products);
+router.get("/methods", UserController.methods);
 
 //// login
 

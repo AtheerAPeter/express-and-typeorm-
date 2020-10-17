@@ -10,8 +10,13 @@ import Validator from "../../helpers/validation.helper";
 import { User } from "../../src/entity/User";
 import * as jwt from "jsonwebtoken";
 import PhoneFormat from "../../helpers/phone.helper";
+import { Category } from "../../src/entity/Category";
+import { Product } from "../../src/entity/Product";
+import { Method } from "../../src/entity/Method";
 
 export default class UserController {
+  ///---------------------Register----------------------------------------//
+
   static async register(req: Request, res: Response): Promise<object> {
     let invalid = validate(req.body, Validator.register());
     if (invalid) return resError(res, invalid);
@@ -22,7 +27,12 @@ export default class UserController {
 
     let user: any;
 
-    user = await User.findOne({ where: { phone: req.body.phone } });
+    try {
+      user = await User.findOne({ where: { phone: req.body.phone } });
+    } catch (err) {
+      return resError(res, "user not found");
+    }
+
     if (user) return resError(res, `Phone ${req.body.phone} already exists`);
     //hash the password
     let password = await hashMe(req.body.password);
@@ -48,25 +58,33 @@ export default class UserController {
     return resData(res, filterPasswordOut(user));
   }
 
+  ///---------------------Login----------------------------------------//
+
   static async login(req: Request, res: Response): Promise<object> {
     //validate
     let invalid = validate(req.body, Validator.login());
     if (invalid) return resError(res, invalid);
 
     //check in database by phone number and token
-    let findOne = await User.findOne({
-      where: {
-        phone: req.body.phone,
-        token: req.headers.token,
-      },
-    });
-
-    if (findOne) {
-      return resData(res, "logged in");
+    try {
+      let findOne = await User.findOne({
+        where: {
+          phone: req.body.phone,
+          token: req.headers.token,
+        },
+      });
+      //if user && if user.completed = true
+      if (findOne) {
+        if (findOne.complete) return resData(res, "logged in");
+        return resError(res, "Registeration is not completed yet (otp)");
+      }
+      return resError(res, "User is not registered");
+    } catch (err) {
+      return resError(res, "error occured");
     }
-
-    return resError(res, "User is not registered");
   }
+
+  ///---------------------otp----------------------//
 
   static async otp(req: Request, res: Response): Promise<object> {
     //validate the otp code looks
@@ -75,17 +93,60 @@ export default class UserController {
 
     //check for token
     let token = req.headers.token;
-    jwt.verify(token, "shhhhh", (err, decoded) => {
+    jwt.verify(token, "shhhhh", async (err, decoded) => {
       //check the token
       if (err) resError(res, "invalid token");
 
       //check the otp
-      if (decoded.otp == req.body.otp) {
-        //update the user
-
-        return resData(res, "correct");
+      try {
+        if (decoded.otp == req.body.otp) {
+          //update the user
+          try {
+            let user = await User.findOne({ where: { phone: decoded.phone } });
+            user.complete = true;
+            await user.save();
+            //send something to tell them its done
+            return resData(res, "Registeration completed");
+          } catch (err) {
+            return resError(res, "user not found");
+          }
+        }
+        return resError(res, `The code ${req.body.otp} is incorrect`);
+      } catch (err) {
+        console.log(err);
       }
-      return resError(res, `The code ${req.body.otp} is incorrect`);
     });
+  }
+
+  ///---------------------get all categories----------------------//
+
+  static async categories(req: Request, res: Response): Promise<object> {
+    try {
+      let categories = await Category.find({ where: { active: true } });
+      return resData(res, { categories });
+    } catch (err) {
+      return resError(res, "categories not found");
+    }
+  }
+
+  ///---------------------get category products by id----------------------//
+  static async products(req: Request, res: Response): Promise<object> {
+    try {
+      let categoryProducts = await Product.find({
+        where: { category: req.params.id, active: true },
+      });
+      return resData(res, categoryProducts);
+    } catch (err) {
+      resError(res, "error occured");
+    }
+  }
+  ///---------------------get methods----------------------//
+  static async methods(req: Request, res: Response): Promise<object> {
+    try {
+      let methods = await Method.find();
+      return resData(res, methods);
+    } catch (err) {
+      resError(res, "error occured");
+    }
   }
 }

@@ -2,6 +2,8 @@ import "reflect-metadata";
 import * as express from "express";
 import v1 from "../route/app/v1";
 import { createConnection } from "typeorm";
+import { Category } from "./entity/Category";
+import { Product } from "./entity/Product";
 
 createConnection()
   .then(async (connection) => {

@@ -19,7 +19,7 @@ export class Category extends BaseEntity {
   @Column()
   image: string;
 
-  @Column({ unique: true, nullable: true })
+  @Column()
   active: boolean;
 
   @Column()
