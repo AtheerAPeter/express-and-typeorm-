@@ -34,4 +34,8 @@ const filterPasswordOut = (user) => {
   return filtered;
 };
 
-export { resError, resData, hashMe, filterPasswordOut };
+const comparePassword = async (password, hash) => {
+  return await bcrypt.compare(password, hash);
+};
+
+export { resError, resData, hashMe, filterPasswordOut, comparePassword };

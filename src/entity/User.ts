@@ -22,7 +22,7 @@ export class User extends BaseEntity {
   @Column()
   password: string;
 
-  @Column()
+  @Column({ nullable: true })
   otp: number;
 
   @Column()
@@ -31,8 +31,6 @@ export class User extends BaseEntity {
   @Column()
   complete: boolean;
 
-  @Column()
-  token: string;
   //timestamp
 
   @Column()

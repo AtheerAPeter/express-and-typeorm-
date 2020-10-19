@@ -3,17 +3,17 @@ import {
   resData,
   resError,
   hashMe,
-  filterPasswordOut,
+  comparePassword,
 } from "../../helpers/tools";
 import * as validate from "validate.js";
 import Validator from "../../helpers/validation.helper";
 import { User } from "../../src/entity/User";
 import * as jwt from "jsonwebtoken";
 import PhoneFormat from "../../helpers/phone.helper";
-import { Category } from "../../src/entity/Category";
+import config from "../../config/config";
 import { Product } from "../../src/entity/Product";
-import { Method } from "../../src/entity/Method";
-
+import { Invoice } from "../../src/entity/Invoice";
+import { InvoiceItem } from "../../src/entity/InvoiceItem";
 export default class UserController {
   ///---------------------Register----------------------------------------//
 
@@ -29,19 +29,25 @@ export default class UserController {
 
     try {
       user = await User.findOne({ where: { phone: req.body.phone } });
+      if (user)
+        if (user.complete)
+          return resError(res, `Phone ${req.body.phone} already exists`);
+        else {
+          const token = jwt.sign({ id: user.id }, config.jwtSecret);
+          user.otp = Math.floor(1000 + Math.random() * 9000);
+          await user.save();
+          user.password = null;
+          user.otp = null;
+          return resData(res, { data: { user, token } });
+        }
     } catch (err) {
-      return resError(res, "user not found");
+      return resError(res, err);
     }
 
-    if (user) return resError(res, `Phone ${req.body.phone} already exists`);
     //hash the password
     let password = await hashMe(req.body.password);
     //create otp
     let otp = Math.floor(1000 + Math.random() * 9000);
-    var token = jwt.sign(
-      { name: req.body.name, phone: req.body.phone, otp },
-      "shhhhh"
-    );
 
     user = await User.create({
       name: req.body.name,
@@ -50,12 +56,14 @@ export default class UserController {
       active: true,
       complete: false,
       otp,
-      token,
     });
 
     await user.save();
+    user.password = null;
+    user.otp = null;
 
-    return resData(res, filterPasswordOut(user));
+    const token = jwt.sign({ id: user.id }, config.jwtSecret);
+    return resData(res, { user, token });
   }
 
   ///---------------------Login----------------------------------------//
@@ -64,21 +72,29 @@ export default class UserController {
     //validate
     let invalid = validate(req.body, Validator.login());
     if (invalid) return resError(res, invalid);
+    let phoneObj = PhoneFormat.getAllFormats(req.body.phone);
+    if (!phoneObj.isNumber)
+      return resError(res, `Phone ${req.body.phone} is not valid`);
 
     //check in database by phone number and token
     try {
-      let findOne = await User.findOne({
+      let user = await User.findOne({
         where: {
-          phone: req.body.phone,
-          token: req.headers.token,
+          phone: phoneObj.globalP,
         },
       });
-      //if user && if user.completed = true
-      if (findOne) {
-        if (findOne.complete) return resData(res, "logged in");
-        return resError(res, "Registeration is not completed yet (otp)");
-      }
-      return resError(res, "User is not registered");
+      //if no user
+      if (!user) return resError(res, "user not registered");
+      //compare the password
+      let validPassword = await comparePassword(
+        req.body.password,
+        user.password
+      );
+      //if password is wrong
+      if (!validPassword) return resError(res, "data is incorrect");
+      //if not wrong make a new token and send
+      const token = jwt.sign({ id: user.id }, config.jwtSecret);
+      return resData(res, token);
     } catch (err) {
       return resError(res, "error occured");
     }
@@ -86,67 +102,99 @@ export default class UserController {
 
   ///---------------------otp----------------------//
 
-  static async otp(req: Request, res: Response): Promise<object> {
+  static async otp(req, res): Promise<object> {
     //validate the otp code looks
     let invalid = validate(req.body, Validator.otp());
     if (invalid) return resError(res, invalid);
 
-    //check for token
+    //get token from headers
     let token = req.headers.token;
-    jwt.verify(token, "shhhhh", async (err, decoded) => {
+
+    jwt.verify(token, config.jwtSecret, async (err, decoded) => {
       //check the token
       if (err) resError(res, "invalid token");
 
-      //check the otp
+      //get user from db
       try {
-        if (decoded.otp == req.body.otp) {
-          //update the user
-          try {
-            let user = await User.findOne({ where: { phone: decoded.phone } });
-            user.complete = true;
-            await user.save();
-            //send something to tell them its done
-            return resData(res, "Registeration completed");
-          } catch (err) {
-            return resError(res, "user not found");
-          }
+        let user = await User.findOne(decoded.id);
+
+        if (!user) return resError(res, "User does not exist");
+        //check if user complete = true
+        if (user.complete) return resError(res, "User already complete");
+        //IF OTP WRONG
+        if (user.otp != req.body.otp) {
+          user.otp = null;
+          await user.save();
+          return resError(res, `OTP ${req.body.otp} is incorrect`);
         }
-        return resError(res, `The code ${req.body.otp} is incorrect`);
+        user.complete = true;
+        await user.save();
+        user.password = null;
+        return resData(res, { user });
       } catch (err) {
-        console.log(err);
+        return resData(res, err);
       }
     });
   }
 
-  ///---------------------get all categories----------------------//
+  //-------------------------make invoide--------------------------//
+  static async makeInvoice(req, res): Promise<object> {
+    //validation
+    let invalid = validate(req.body, Validator.invoiceValidation());
+    if (invalid) return resError(res, invalid);
 
-  static async categories(req: Request, res: Response): Promise<object> {
-    try {
-      let categories = await Category.find({ where: { active: true } });
-      return resData(res, { categories });
-    } catch (err) {
-      return resError(res, "categories not found");
+    //get products and quantity if the format is not valid
+    let ids = [];
+    //check every single product in the array for validation
+    for (let iterator of req.body.products) {
+      let invalid = validate(iterator, Validator.oneProduct());
+      if (invalid) return resError(res, invalid);
+      ids.push(iterator.id);
     }
-  }
 
-  ///---------------------get category products by id----------------------//
-  static async products(req: Request, res: Response): Promise<object> {
-    try {
-      let categoryProducts = await Product.find({
-        where: { category: req.params.id, active: true },
+    //get the user
+    let user = req.user;
+
+    //get the products from db
+    let products = await Product.findByIds(ids);
+
+    //calculate the total
+
+    let total = 0;
+    for (let product of products) {
+      total =
+        total +
+        product.price *
+          req.body.products.filter((e) => (e.id = product.id))[0].quantity;
+    }
+
+    //make the invoice
+    let invoice: any;
+    invoice = await Invoice.create({
+      ...req.body,
+      total,
+      status: "pending",
+      user,
+    });
+    await invoice.save();
+
+    //zc stuff
+
+    //invoice items to connect products with the user
+
+    for (const product of products) {
+      let invoiceItem = await InvoiceItem.create({
+        quantity: req.body.products.filter((e) => (e.id = product.id))[0]
+          .quantity,
+        invoice,
+        subTotal:
+          req.body.products.filter((e) => (e.id = product.id))[0].quantity *
+          product.price,
+        product,
       });
-      return resData(res, categoryProducts);
-    } catch (err) {
-      resError(res, "error occured");
+      await invoiceItem.save();
     }
-  }
-  ///---------------------get methods----------------------//
-  static async methods(req: Request, res: Response): Promise<object> {
-    try {
-      let methods = await Method.find();
-      return resData(res, methods);
-    } catch (err) {
-      resError(res, "error occured");
-    }
+
+    return resData(res, { invoice });
   }
 }
