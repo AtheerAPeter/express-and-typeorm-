@@ -10,6 +10,8 @@ router.post("/register", UserController.register);
 router.post("/login", UserController.login);
 router.post("/otp", UserController.otp);
 router.post("/invoice", userAuth, UserController.makeInvoice);
+router.post("/forgot", UserController.forgotPassword);
+router.post("/forgotverify", userAuth, UserController.verifyForgot);
 
 //home
 router.get("/categories", HomeController.categories);

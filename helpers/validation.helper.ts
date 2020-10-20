@@ -75,4 +75,22 @@ export default class Validator {
       type: "number",
     },
   });
+  static forgotPassword = (must = true) => ({
+    phone: {
+      presence: must,
+      type: "string",
+      length: { maximum: 15, minimum: 10 },
+    },
+  });
+
+  static forgotVerify = (must = true) => ({
+    code: {
+      presence: must,
+      type: "number",
+    },
+    newPassword: {
+      presence: must,
+      length: { maximum: 15, minimum: 4 },
+    },
+  });
 }

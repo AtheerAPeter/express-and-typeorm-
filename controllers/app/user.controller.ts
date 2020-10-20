@@ -197,4 +197,50 @@ export default class UserController {
 
     return resData(res, { invoice });
   }
+
+  ///---------------------forgot password --------------------------//
+  static async forgotPassword(req, res): Promise<object> {
+    //validate
+    let invalid = validate(req.body, Validator.forgotPassword());
+    if (invalid) return resError(res, invalid);
+    let phoneObj = PhoneFormat.getAllFormats(req.body.phone);
+    if (!phoneObj.isNumber)
+      return resError(res, `Phone ${req.body.phone} is not valid`);
+
+    //get the phone number then check db for it if found then send otp
+    try {
+      let user: any;
+      user = await User.findOne({ where: { phone: phoneObj.globalP } });
+      //if user registered send otp and token to avoid making the user resend the number again, if not, user should register
+      if (user.complete) {
+        const token = jwt.sign({ id: user.id }, config.jwtSecret);
+        let otp = Math.floor(1000 + Math.random() * 9000);
+        user.otp = otp;
+        await user.save();
+        return resData(res, { code: otp, token });
+      }
+    } catch (error) {
+      return resError(res, "user is not registered");
+    }
+  }
+  static async verifyForgot(req, res): Promise<object> {
+    //validate
+    let invalid = validate(req.body, Validator.forgotVerify());
+    if (invalid) return resError(res, invalid);
+    // get user from db
+    let user = req.user;
+    //if the code is incorrect
+    if (user.otp != req.body.code) {
+      user.otp = null;
+      await user.save();
+      return resError(
+        res,
+        `the code ${req.body.code} is incorrect go back to forgot password page`
+      );
+    }
+    //if correct
+    user.password = await hashMe(req.body.newPassword);
+    await user.save();
+    return resData(res, "The new password has been set, go to login page");
+  }
 }
