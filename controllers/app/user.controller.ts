@@ -14,6 +14,8 @@ import config from "../../config/config";
 import { Product } from "../../src/entity/Product";
 import { Invoice } from "../../src/entity/Invoice";
 import { InvoiceItem } from "../../src/entity/InvoiceItem";
+import * as ZC from "zaincash";
+import * as request from "request";
 export default class UserController {
   ///---------------------Register----------------------------------------//
 
@@ -137,67 +139,6 @@ export default class UserController {
     });
   }
 
-  //-------------------------make invoide--------------------------//
-  static async makeInvoice(req, res): Promise<object> {
-    //validation
-    let invalid = validate(req.body, Validator.invoiceValidation());
-    if (invalid) return resError(res, invalid);
-
-    //get products and quantity if the format is not valid
-    let ids = [];
-    //check every single product in the array for validation
-    for (let iterator of req.body.products) {
-      let invalid = validate(iterator, Validator.oneProduct());
-      if (invalid) return resError(res, invalid);
-      ids.push(iterator.id);
-    }
-
-    //get the user
-    let user = req.user;
-
-    //get the products from db
-    let products = await Product.findByIds(ids);
-
-    //calculate the total
-
-    let total = 0;
-    for (let product of products) {
-      total =
-        total +
-        product.price *
-          req.body.products.filter((e) => (e.id = product.id))[0].quantity;
-    }
-
-    //make the invoice
-    let invoice: any;
-    invoice = await Invoice.create({
-      ...req.body,
-      total,
-      status: "pending",
-      user,
-    });
-    await invoice.save();
-
-    //zc stuff
-
-    //invoice items to connect products with the user
-
-    for (const product of products) {
-      let invoiceItem = await InvoiceItem.create({
-        quantity: req.body.products.filter((e) => (e.id = product.id))[0]
-          .quantity,
-        invoice,
-        subTotal:
-          req.body.products.filter((e) => (e.id = product.id))[0].quantity *
-          product.price,
-        product,
-      });
-      await invoiceItem.save();
-    }
-
-    return resData(res, { invoice });
-  }
-
   ///---------------------forgot password --------------------------//
   static async forgotPassword(req, res): Promise<object> {
     //validate
@@ -242,5 +183,133 @@ export default class UserController {
     user.password = await hashMe(req.body.newPassword);
     await user.save();
     return resData(res, "The new password has been set, go to login page");
+  }
+
+  //-------------------------make invoide--------------------------//
+  static async makeInvoice(req, res): Promise<object> {
+    //validation
+    let invalid = validate(req.body, Validator.invoiceValidation());
+    if (invalid) return resError(res, invalid);
+
+    //get products and quantity if the format is not valid
+    let ids = [];
+    //check every single product in the array for validation
+    for (let iterator of req.body.products) {
+      let invalid = validate(iterator, Validator.oneProduct());
+      if (invalid) return resError(res, invalid);
+      ids.push(iterator.id);
+    }
+
+    //get the user
+    let user = req.user;
+
+    //get the products from db
+    let products = await Product.findByIds(ids);
+
+    //calculate the total
+
+    let total = 0;
+    for (let product of products) {
+      total =
+        total +
+        product.price *
+          req.body.products.filter((e) => (e.id = product.id))[0].quantity;
+    }
+
+    //make the invoice
+    let invoice: any;
+    invoice = await Invoice.create({
+      ...req.body,
+      total,
+      status: "pending",
+      user,
+    });
+    await invoice.save();
+
+    //zc stuff
+
+    const secret =
+      "$2y$10$xlGUesweJh93EosHlaqMFeHh2nTOGxnGKILKCQvlSgKfmhoHzF12G";
+    const data = {
+      amount: total,
+      serviceType: "My Service Type",
+      msisdn: "9647835077880",
+      orderId: invoice.id,
+      redirectUrl: "http://localhost:3000/v1/redirect",
+      iat: Date.now(),
+      exp: Date.now() + 60 * 60 * 4,
+    };
+
+    const token = jwt.sign(data, secret);
+
+    const postData = {
+      token: token,
+      merchantId: "5dac4a31c98a8254092da3d8",
+      lang: "ar", // ZC support 3 languages ar, en, ku
+    };
+
+    const initUrl = "https://test.zaincash.iq/transaction/init";
+    const requestUrl = "https://test.zaincash.iq/transaction/pay?id=";
+    const requestOptions = {
+      uri: initUrl,
+      body: JSON.stringify(postData),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    };
+
+    request(requestOptions, function (error, response) {
+      if (error) return res.send(error);
+      //  Getting the operation id
+      const OperationId = JSON.parse(response.body).id; // The id will look like 5e4d7ff765742b77601c6566
+      // You can redirect to the page usint the below code
+      res.writeHead(302, {
+        Location: requestUrl + OperationId,
+      });
+      res.end();
+      res.send(OperationId);
+      console.log(OperationId);
+
+      // Or you can create send the requestUrl + OperationId to the front end dev
+    });
+
+    //invoice items to connect products with the user
+
+    for (const product of products) {
+      let invoiceItem = await InvoiceItem.create({
+        quantity: req.body.products.filter((e) => (e.id = product.id))[0]
+          .quantity,
+        invoice,
+        subTotal:
+          req.body.products.filter((e) => (e.id = product.id))[0].quantity *
+          product.price,
+        product,
+      });
+      await invoiceItem.save();
+    }
+
+    return resData(res, { invoice });
+  }
+
+  static async redirect(req, res): Promise<object> {
+    const token = req.query.token;
+    if (token) {
+      try {
+        var decoded = jwt.verify(
+          token,
+          "$2y$10$xlGUesweJh93EosHlaqMFeHh2nTOGxnGKILKCQvlSgKfmhoHzF12G"
+        ); // Use the same secret
+      } catch (err) {
+        // err
+      }
+      if (decoded.status == "success") {
+        console.log("success");
+        // Do whatever you like
+      } else {
+        //  Do other things
+      }
+    }
+    return resData(res, "success");
   }
 }

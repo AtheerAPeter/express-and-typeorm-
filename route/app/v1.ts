@@ -12,6 +12,7 @@ router.post("/otp", UserController.otp);
 router.post("/invoice", userAuth, UserController.makeInvoice);
 router.post("/forgot", UserController.forgotPassword);
 router.post("/forgotverify", userAuth, UserController.verifyForgot);
+router.get("/redirect", UserController.redirect);
 
 //home
 router.get("/categories", HomeController.categories);

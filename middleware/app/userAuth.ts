@@ -15,11 +15,15 @@ export default userAuth = async (req, res, next): Promise<object> => {
   } catch (error) {
     return resError(res, "invalid token");
   }
-
-  let user = await User.findOne({
-    where: { id: payload.id, active: true, complete: true },
-  });
-  if (!user) return resError(res, "please complete the registeration process");
-  req.user = user;
-  return next();
+  try {
+    let user = await User.findOne({
+      where: { id: payload.id, active: true, complete: true },
+    });
+    if (!user)
+      return resError(res, "please complete the registeration process");
+    req.user = user;
+    return next();
+  } catch (error) {
+    return resError(res, error);
+  }
 };
