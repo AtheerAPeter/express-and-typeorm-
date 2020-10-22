@@ -15,7 +15,6 @@ import { Product } from "../../src/entity/Product";
 import { Invoice } from "../../src/entity/Invoice";
 import { InvoiceItem } from "../../src/entity/InvoiceItem";
 import * as ZC from "zaincash";
-import * as request from "request";
 export default class UserController {
   ///---------------------Register----------------------------------------//
 
@@ -30,7 +29,7 @@ export default class UserController {
     let user: any;
 
     try {
-      user = await User.findOne({ where: { phone: req.body.phone } });
+      user = await User.findOne({ where: { phone: phoneObj.globalP } });
       if (user)
         if (user.complete)
           return resError(res, `Phone ${req.body.phone} already exists`);
@@ -154,7 +153,7 @@ export default class UserController {
       user = await User.findOne({ where: { phone: phoneObj.globalP } });
       //if user registered send otp and token to avoid making the user resend the number again, if not, user should register
       if (user.complete) {
-        const token = jwt.sign({ id: user.id }, config.jwtSecret);
+        const token = jwt.sign({ phone: phoneObj.globalP }, config.jwtSecret);
         let otp = Math.floor(1000 + Math.random() * 9000);
         user.otp = otp;
         await user.save();
@@ -165,24 +164,35 @@ export default class UserController {
     }
   }
   static async verifyForgot(req, res): Promise<object> {
+    let phone: any;
+    try {
+      phone = jwt.verify(req.headers.token, config.jwtSecret).phone;
+    } catch (err) {
+      return resError(res, err);
+    }
+
     //validate
     let invalid = validate(req.body, Validator.forgotVerify());
     if (invalid) return resError(res, invalid);
     // get user from db
-    let user = req.user;
-    //if the code is incorrect
-    if (user.otp != req.body.code) {
-      user.otp = null;
+    try {
+      let user = await User.findOne({ where: { phone } });
+      if (user.otp != req.body.code) {
+        user.otp = null;
+        await user.save();
+        return resError(
+          res,
+          `the code ${req.body.code} is incorrect go back to forgot password page`
+        );
+      }
+      //if correct
+      user.password = await hashMe(req.body.newPassword);
       await user.save();
-      return resError(
-        res,
-        `the code ${req.body.code} is incorrect go back to forgot password page`
-      );
+      //if the code is incorrect
+      return resData(res, "The new password has been set, go to login page");
+    } catch (error) {
+      resError(res, error);
     }
-    //if correct
-    user.password = await hashMe(req.body.newPassword);
-    await user.save();
-    return resData(res, "The new password has been set, go to login page");
   }
 
   //-------------------------make invoide--------------------------//
@@ -227,52 +237,29 @@ export default class UserController {
     await invoice.save();
 
     //zc stuff
-
-    const secret =
-      "$2y$10$xlGUesweJh93EosHlaqMFeHh2nTOGxnGKILKCQvlSgKfmhoHzF12G";
-    const data = {
-      amount: total,
-      serviceType: "My Service Type",
-      msisdn: "9647835077880",
+    const paymentData = {
+      amount: total * 1000,
       orderId: invoice.id,
-      redirectUrl: "http://localhost:3000/v1/redirect",
-      iat: Date.now(),
-      exp: Date.now() + 60 * 60 * 4,
+      serviceType: "FikraCamps Shop",
+      redirectUrl: "localhost:3000/v1/zc/redirect",
+      production: false,
+      msisdn: config.zcMsid,
+      merchantId: config.zcMerchant,
+      secret: config.zcSecret,
+      lang: "ar",
     };
-
-    const token = jwt.sign(data, secret);
-
-    const postData = {
-      token: token,
-      merchantId: "5dac4a31c98a8254092da3d8",
-      lang: "ar", // ZC support 3 languages ar, en, ku
-    };
-
-    const initUrl = "https://test.zaincash.iq/transaction/init";
-    const requestUrl = "https://test.zaincash.iq/transaction/pay?id=";
-    const requestOptions = {
-      uri: initUrl,
-      body: JSON.stringify(postData),
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    };
-
-    request(requestOptions, function (error, response) {
-      if (error) return res.send(error);
-      //  Getting the operation id
-      const OperationId = JSON.parse(response.body).id; // The id will look like 5e4d7ff765742b77601c6566
-      // You can redirect to the page usint the below code
-      res.writeHead(302, {
-        Location: requestUrl + OperationId,
-      });
-      res.end();
-      res.send(OperationId);
-      console.log(OperationId);
-
-      // Or you can create send the requestUrl + OperationId to the front end dev
-    });
+    let url: any;
+    let transactionId: any;
+    let zc = new ZC(paymentData);
+    try {
+      transactionId = await zc.init();
+      url = `https://test.zaincash.iq/transaction/pay?id=${transactionId}`;
+      invoice.zcTransactionID = transactionId;
+      await invoice.save();
+      console.log(transactionId);
+    } catch (err) {
+      return resError(res, err);
+    }
 
     //invoice items to connect products with the user
 
@@ -289,24 +276,41 @@ export default class UserController {
       await invoiceItem.save();
     }
 
-    return resData(res, { invoice });
+    return resData(res, { invoice, url });
   }
-
+  /**
+   *
+   * @param req
+   * @param res
+   */
   static async redirect(req, res): Promise<object> {
     const token = req.query.token;
+    let decoded: any;
     if (token) {
       try {
-        var decoded = jwt.verify(
-          token,
-          "$2y$10$xlGUesweJh93EosHlaqMFeHh2nTOGxnGKILKCQvlSgKfmhoHzF12G"
-        ); // Use the same secret
+        decoded = jwt.verify(token, config.zcSecret); // Use the same secret
       } catch (err) {
+        return resError(res, err);
         // err
       }
+
+      const id = decoded.orderid;
+      let invoice = await Invoice.findOne(id);
+      if (!invoice) return resError(res, "no such invoice");
+
       if (decoded.status == "success") {
+        invoice.status = "paid";
+        invoice.zcOperation = decoded.operationid;
+        invoice.zcMsisdn = decoded.msisdn;
+        await invoice.save();
         console.log("success");
+        return resData(res, { invoice });
         // Do whatever you like
       } else {
+        invoice.status = decoded.status;
+        invoice.zcOperation = decoded.operationid;
+        invoice.zcMsg = decoded.msg;
+        await invoice.save();
         //  Do other things
       }
     }
