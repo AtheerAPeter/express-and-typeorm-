@@ -27,18 +27,8 @@ createConnection()
     app.use((req, res, next) => {
       return resError(
         res,
-        `
-      this api contains 
-      /register to register
-      /login to login
-      /otp to verify phone number
-      /invoice to make an invoice
-      /forgot and /forgotverify if password was forgotten
-      /catigories toget categories
-      /products/id to get a product by id
-      /methods get payment methods
-      /invoices to get the user's own invoices 
-      `
+        "this api contains: /register to register, /login to login, /otp to verify phone number, /invoice to make an invoice, /forgot and /forgotverify if password was forgotten, /catigories toget categories, /products/id to get a product by id, /methods get payment methods, /invoices to get the user's own invoices ",
+        404
       );
     });
     app.listen(port, () => console.log(`Running on port: ${port}`));
