@@ -1,10 +1,10 @@
 {
    "type": "postgres",
-   "host": "localhost",
+   "host": "ec2-54-246-85-151.eu-west-1.compute.amazonaws.com",
    "port": 5432,
-   "username": "popos",
-   "password": "atheer",
-   "database": "shop-test2",
+   "username": "abzuuefaxtcgaq",
+   "password": "63cc892df89d0833a5c28c67c0ea8300947f7094cc3f84be9fb50301a4692b4d",
+   "database": "d2dnu6lprkf0ca",
    "synchronize": true,
    "logging": false,
    "entities": [
