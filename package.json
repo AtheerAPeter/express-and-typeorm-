@@ -3,9 +3,7 @@
    "version": "0.0.1",
    "description": "Awesome project developed with TypeORM.",
    "devDependencies": {
-      "@types/express": "^4.17.8",
-      "@types/node": "^8.0.29",
-      "@types/validate.js": "^0.11.0",
+     
       "ts-node": "^3.3.0",
       "typescript": "3.3.3333"
    },
@@ -23,7 +21,10 @@
       "validate.js": "^0.13.1",
       "zaincash": "^1.0.5",
       "ts-node": "^3.3.0", 
-      "typescript": "3.3.3333"
+      "typescript": "3.3.3333",
+      "@types/express": "^4.17.8",
+      "@types/node": "^8.0.29",
+      "@types/validate.js": "^0.11.0"
    },
    "scripts": {
       "start": "ts-node src/index.ts",
